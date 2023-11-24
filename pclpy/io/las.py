@@ -31,13 +31,14 @@ def read(path, point_type, xyz_offset=None):
     assert point_type in "PointXYZ PointXYZI PointXYZINormal PointNormal PointXYZRGBNormal PointXYZRGBA"
     if xyz_offset is None:
         xyz_offset = np.array([0, 0, 0])
-    with laspy.file.File(path) as f:
+    with laspy.open(path) as f:
         supported_attrs = "x y z intensity normal_x normal_y normal_z curvature".split()  # rgb below
         point_type_attrs = [a for a in dir(getattr(pcl.point_types, point_type)) if not a.startswith("_")]
         pcl_attrs = [attr for attr in supported_attrs if attr in point_type_attrs]
-        xyz_data = np.zeros((f.header.count, len(pcl_attrs)), "f")
+        xyz_data = np.zeros((f.header.point_count, len(pcl_attrs)), "f")
+        pointreader = f.read()
         for n, attr in enumerate(pcl_attrs):
-            val = getattr(f, attr)
+            val = getattr(pointreader, attr)
             pos = "xyz".find(attr)
             if pos != -1:
                 val -= xyz_offset[pos]
@@ -75,33 +76,36 @@ def write(cloud, path, write_extra_dimensions=True, scale=0.0001, xyz_offset=Non
         point_format = 2
     header = laspy.header.Header(point_format=point_format)
 
-    with laspy.file.File(path, mode="w", header=header) as f:
+    with laspy.open(path, mode="w", header=header) as f:
         extra_dims = []
         if write_extra_dimensions:
             extra_dims = get_extra_dims(cloud)
             for dim in extra_dims:
                 data_type = get_las_data_type(getattr(cloud, dim))
-                f.define_new_dimension(dim, data_type, dim)
+                f.header.add_extra_dims(dim)
 
         f.header.scale = (scale, scale, scale)
 
         if xyz_offset is not None:
             f.header.offset = xyz_offset
-            f.x = cloud.x.astype("d") + xyz_offset[0]
-            f.y = cloud.y.astype("d") + xyz_offset[1]
-            f.z = cloud.z.astype("d") + xyz_offset[2]
+            point_record = laspy.ScaleAwarePointRecord.zeros(len(cloud.x) ,header=f.header)
+            point_record.x = cloud.x
+            point_record.y = cloud.y
+            point_record.z = cloud.z
         else:
             f.header.offset = cloud.xyz.min(axis=0)
-            f.x = cloud.x
-            f.y = cloud.y
-            f.z = cloud.z
+            point_record = laspy.ScaleAwarePointRecord.zeros(len(cloud.x), header=f.header)
+            point_record.x = cloud.x
+            point_record.y = cloud.y
+            point_record.z = cloud.z
 
         if has_color:
-            f.red = cloud.r * 2 ** 8
-            f.green = cloud.g * 2 ** 8
-            f.blue = cloud.b * 2 ** 8
+            point_record.red = cloud.r * 2 ** 8
+            point_record.green = cloud.g * 2 ** 8
+            point_record.blue = cloud.b * 2 ** 8
         if has("intensity"):
-            f.intensity = cloud.intensity * 65535
+            point_record.intensity = cloud.intensity * 65535
 
         for dim in extra_dims:
-            setattr(f, dim, getattr(cloud, dim))
+            setattr(point_record, dim, getattr(cloud, dim))
+    f.write_points(point_record)
