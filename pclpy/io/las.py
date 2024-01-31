@@ -31,13 +31,18 @@ def read(path, point_type, xyz_offset=None):
     assert point_type in "PointXYZ PointXYZI PointXYZINormal PointNormal PointXYZRGBNormal PointXYZRGBA"
     if xyz_offset is None:
         xyz_offset = np.array([0, 0, 0])
-    with laspy.file.File(path) as f:
+    with laspy.open(path) as f:
         supported_attrs = "x y z intensity normal_x normal_y normal_z curvature".split()  # rgb below
         point_type_attrs = [a for a in dir(getattr(pcl.point_types, point_type)) if not a.startswith("_")]
         pcl_attrs = [attr for attr in supported_attrs if attr in point_type_attrs]
-        xyz_data = np.zeros((f.header.count, len(pcl_attrs)), "f")
+        xyz_data = np.zeros((f.header.point_count, len(pcl_attrs)), "f")
+
+        lasread = f.read()
+        lasread.points = lasread.points[lasread.classification <= 2]
+
         for n, attr in enumerate(pcl_attrs):
-            val = getattr(f, attr)
+            print(lasread.classification)
+            val = getattr(lasread, attr)
             pos = "xyz".find(attr)
             if pos != -1:
                 val -= xyz_offset[pos]
