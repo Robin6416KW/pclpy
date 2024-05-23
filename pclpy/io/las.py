@@ -36,10 +36,8 @@ def read(path, point_type, xyz_offset=None):
         point_type_attrs = [a for a in dir(getattr(pcl.point_types, point_type)) if not a.startswith("_")]
         pcl_attrs = [attr for attr in supported_attrs if attr in point_type_attrs]
         xyz_data = np.zeros((f.header.point_count, len(pcl_attrs)), "f")
-
         lasread = f.read()
-        lasread.points = lasread.points[lasread.classification <= 2]
-
+        #lasread.points = lasread.points[lasread.classification <= 2] #for import specific classification
         for n, attr in enumerate(pcl_attrs):
             print(lasread.classification)
             val = getattr(lasread, attr)
