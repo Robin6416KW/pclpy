@@ -90,21 +90,23 @@ def write(cloud, path, write_extra_dimensions=True, scale=0.0001, xyz_offset=Non
 
         if xyz_offset is not None:
             f.header.offset = xyz_offset
-            f.x = cloud.x.astype("d") + xyz_offset[0]
-            f.y = cloud.y.astype("d") + xyz_offset[1]
-            f.z = cloud.z.astype("d") + xyz_offset[2]
+            point_record = laspy.ScaleAwarePointRecord.zeros(len(cloud.x) ,header=f.header)
+            point_record.x = cloud.x
+            point_record.y = cloud.y
+            point_record.z = cloud.z
         else:
-            f.header.offset = cloud.xyz.min(axis=0)
-            f.x = cloud.x
-            f.y = cloud.y
-            f.z = cloud.z
+           f.header.offset = cloud.xyz.min(axis=0)
+            point_record = laspy.ScaleAwarePointRecord.zeros(len(cloud.x), header=f.header)
+            point_record.x = cloud.x
+            point_record.y = cloud.y
+            point_record.z = cloud.z
 
         if has_color:
-            f.red = cloud.r * 2 ** 8
-            f.green = cloud.g * 2 ** 8
-            f.blue = cloud.b * 2 ** 8
+            point_record.red = cloud.r * 2 ** 8
+            point_record.green = cloud.g * 2 ** 8
+            point_record.blue = cloud.b * 2 ** 8
         if has("intensity"):
-            f.intensity = cloud.intensity * 65535
+            point_record.intensity = cloud.intensity * 65535
 
         for dim in extra_dims:
-            setattr(f, dim, getattr(cloud, dim))
+            setattr(point_record, dim, getattr(cloud, dim))
